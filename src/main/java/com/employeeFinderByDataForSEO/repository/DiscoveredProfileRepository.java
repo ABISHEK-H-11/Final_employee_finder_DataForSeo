@@ -1,6 +1,7 @@
 package com.employeeFinderByDataForSEO.repository;
 
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.employeeFinderByDataForSEO.Entity.DiscoveredProfile;
@@ -19,6 +20,12 @@ public interface DiscoveredProfileRepository
             findTop10ByCompanyKeyAndReturnedFalseOrderByIdAsc(
                     String companyKey
             );
+
+    List<DiscoveredProfile>
+    findByCompanyKeyAndReturnedFalseOrderByIdAsc(
+            String companyKey,
+            Pageable pageable
+    );
 
     long countByCompanyKeyAndReturnedFalse(
             String companyKey
