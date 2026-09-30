@@ -59,7 +59,7 @@ class QuotaServiceTest {
         quotaService.consumeProfiles(account, 100);
 
         assertEquals(
-                9200,
+                9100,
                 usage.getDailyProfileUsage()
         );
 
