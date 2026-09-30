@@ -11,6 +11,8 @@ import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -47,7 +49,7 @@ class QuotaServiceTest {
         AccountUsage usage =
                 new AccountUsage(
                         9000,
-                        LocalDateTime.of(2026, 9, 29, 9, 0),
+                        getCurrentQuotaPeriodStart(),
                         account
                 );
 
@@ -71,7 +73,7 @@ class QuotaServiceTest {
         AccountUsage usage =
                 new AccountUsage(
                         9950,
-                        LocalDateTime.of(2026, 9, 29, 9, 0),
+                        getCurrentQuotaPeriodStart(),
                         account
                 );
 
@@ -94,11 +96,16 @@ class QuotaServiceTest {
 
     @Test
     void shouldResetUsageAtStartOfNewQuotaPeriod() {
+        LocalDateTime currentPeriod =
+                getCurrentQuotaPeriodStart();
+
+        LocalDateTime previousPeriod =
+                currentPeriod.minusDays(1);
 
         AccountUsage usage =
                 new AccountUsage(
                         5000,
-                        LocalDateTime.of(2026, 9, 28, 9, 0),
+                        previousPeriod,
                         account
                 );
 
@@ -116,7 +123,7 @@ class QuotaServiceTest {
         );
 
         assertEquals(
-                LocalDateTime.of(2026, 9, 29, 9, 0),
+                currentPeriod,
                 usage.getLastResetAt()
         );
 
@@ -130,7 +137,7 @@ class QuotaServiceTest {
         AccountUsage usage =
                 new AccountUsage(
                         9995,
-                        LocalDateTime.of(2026, 9, 29, 9, 0),
+                        getCurrentQuotaPeriodStart(),
                         account
                 );
 
@@ -146,5 +153,23 @@ class QuotaServiceTest {
 
         Mockito.verify(accountUsageRepository)
                 .save(usage);
+    }
+    private LocalDateTime getCurrentQuotaPeriodStart() {
+
+        ZoneId businessZone = ZoneId.of("Asia/Kolkata");
+
+        ZonedDateTime now =
+                ZonedDateTime.now(businessZone);
+
+        ZonedDateTime todayReset =
+                now.toLocalDate()
+                        .atTime(9, 0)
+                        .atZone(businessZone);
+
+        if (now.isBefore(todayReset)) {
+            todayReset = todayReset.minusDays(1);
+        }
+
+        return todayReset.toLocalDateTime();
     }
 }
