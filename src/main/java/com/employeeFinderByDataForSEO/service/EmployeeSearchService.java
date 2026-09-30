@@ -12,6 +12,7 @@ import jakarta.transaction.Transactional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
@@ -197,7 +198,9 @@ public class EmployeeSearchService {
      * while two threads hitting the SAME company are serialized.
      */
     @Transactional
-    public List<EmployeeResponse> search(String company) {
+    public List<EmployeeResponse> search(
+            String company,
+            int maxProfiles) {
 
         String cleanCompany = validateAndClean(company);
 
@@ -211,7 +214,7 @@ public class EmployeeSearchService {
 
         synchronized (lock) {
 
-            return searchLocked(cleanCompany, companyKey);
+            return searchLocked(cleanCompany, companyKey, maxProfiles);
         }
     }
 
@@ -252,7 +255,8 @@ public class EmployeeSearchService {
 
     private List<EmployeeResponse> searchLocked(
             String cleanCompany,
-            String companyKey) {
+            String companyKey,
+            int maxProfiles) {
 
         CompanySearchState state =
                 companySearchStateRepository
@@ -302,8 +306,9 @@ public class EmployeeSearchService {
 
         List<DiscoveredProfile> profiles =
                 discoveredProfileRepository
-                        .findTop10ByCompanyKeyAndReturnedFalseOrderByIdAsc(
-                                companyKey
+                        .findByCompanyKeyAndReturnedFalseOrderByIdAsc(
+                                companyKey,
+                                PageRequest.of(0, maxProfiles )
                         );
 
         if (profiles.isEmpty()) {
