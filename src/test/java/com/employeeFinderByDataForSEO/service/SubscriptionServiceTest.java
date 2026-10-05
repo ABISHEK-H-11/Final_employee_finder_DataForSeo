@@ -211,4 +211,34 @@ class SubscriptionServiceTest {
                 subscription.getStatus()
         );
     }
+    @Test
+    void shouldCreateSubscriptionForNewAccount() {
+
+        when(subscriptionRepository.findByAccount(account))
+                .thenReturn(Optional.empty());
+
+        when(subscriptionRepository.save(any(Subscription.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        Subscription result =
+                subscriptionService.createSubscription(account);
+
+        assertNotNull(result);
+
+        assertEquals(
+                Subscription.Plan.STANDARD,
+                result.getPlan()
+        );
+
+        assertEquals(
+                Subscription.SubscriptionStatus.ACTIVE,
+                result.getStatus()
+        );
+
+        assertNotNull(result.getStartDate());
+        assertNotNull(result.getEndDate());
+
+        verify(subscriptionRepository)
+                .save(any(Subscription.class));
+    }
 }

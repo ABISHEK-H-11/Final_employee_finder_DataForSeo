@@ -13,20 +13,44 @@ public class SubscriptionService {
 
     private final SubscriptionRepository subscriptionRepository;
 
-    public SubscriptionService(
-            SubscriptionRepository subscriptionRepository) {
-
+    public SubscriptionService(SubscriptionRepository subscriptionRepository) {
         this.subscriptionRepository = subscriptionRepository;
     }
 
     public Subscription createSubscription(Account account) {
 
-        if (subscriptionRepository.findByAccount(account).isPresent()) {
-            throw new SubscriptionException(
-                    "Account already has a subscription"
+        LocalDateTime now = LocalDateTime.now();
+
+        // Check if account already has a subscription
+        var existingSubscription =
+                subscriptionRepository.findByAccount(account);
+
+        if (existingSubscription.isPresent()) {
+
+            Subscription subscription = existingSubscription.get();
+
+            // Active subscription cannot be created again
+            if (subscription.getStatus()
+                    == Subscription.SubscriptionStatus.ACTIVE
+                    && subscription.getEndDate().isAfter(now)) {
+
+                throw new SubscriptionException(
+                        "Account already has an active subscription"
+                );
+            }
+
+            // Existing subscription has expired
+            subscription.setPlan(Subscription.Plan.STANDARD);
+            subscription.setStatus(
+                    Subscription.SubscriptionStatus.ACTIVE
             );
+            subscription.setStartDate(now);
+            subscription.setEndDate(now.plusMonths(1));
+
+            return subscriptionRepository.save(subscription);
         }
 
+        // First subscription for the account
         Subscription subscription = new Subscription();
 
         subscription.setAccount(account);
@@ -34,12 +58,8 @@ public class SubscriptionService {
         subscription.setStatus(
                 Subscription.SubscriptionStatus.ACTIVE
         );
-
-        LocalDateTime startDate = LocalDateTime.now();
-        LocalDateTime endDate = startDate.plusMonths(1);
-
-        subscription.setStartDate(startDate);
-        subscription.setEndDate(endDate);
+        subscription.setStartDate(now);
+        subscription.setEndDate(now.plusMonths(1));
 
         return subscriptionRepository.save(subscription);
     }
@@ -53,16 +73,17 @@ public class SubscriptionService {
                                 "No active subscription found"
                         ));
 
-        if (subscription.getStatus() !=
-                Subscription.SubscriptionStatus.ACTIVE) {
+        LocalDateTime now = LocalDateTime.now();
+
+        if (subscription.getStatus()
+                != Subscription.SubscriptionStatus.ACTIVE) {
 
             throw new SubscriptionException(
                     "Subscription is not active"
             );
         }
 
-        if (subscription.getEndDate()
-                .isBefore(LocalDateTime.now())) {
+        if (subscription.getEndDate().isBefore(now)) {
 
             subscription.setStatus(
                     Subscription.SubscriptionStatus.EXPIRED
@@ -81,6 +102,7 @@ public class SubscriptionService {
         try {
             checkActiveSubscription(account);
             return true;
+
         } catch (SubscriptionException e) {
             return false;
         }
