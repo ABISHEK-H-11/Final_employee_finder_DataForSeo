@@ -2,6 +2,7 @@ package com.employeeFinderByDataForSEO.controller;
 
 import com.employeeFinderByDataForSEO.Entity.Account;
 import com.employeeFinderByDataForSEO.dto.EmployeeResponse;
+import com.employeeFinderByDataForSEO.exception.SubscriptionException;
 import com.employeeFinderByDataForSEO.repository.AccountRepository;
 import com.employeeFinderByDataForSEO.service.EmployeeSearchService;
 import com.employeeFinderByDataForSEO.service.QuotaService;
@@ -138,6 +139,72 @@ class EmployeeControllerTest {
                 .checkActiveSubscription(account);
 
         verify(quotaService)
+                .checkQuota(account);
+
+        verify(employeeSearchService, never())
+                .search(anyString(), anyInt());
+    }
+
+    @Test
+    void shouldRejectWhenSubscriptionIsExpired() {
+
+        when(authentication.getName())
+                .thenReturn("test@example.com");
+
+        when(accountRepository.findByEmail("test@example.com"))
+                .thenReturn(Optional.of(account));
+
+        doThrow(new SubscriptionException(
+                "Subscription has expired"
+        ))
+                .when(subscriptionService)
+                .checkActiveSubscription(account);
+
+        assertThrows(
+                SubscriptionException.class,
+                () -> employeeController.search(
+                        "Wipro",
+                        authentication
+                )
+        );
+
+        verify(subscriptionService)
+                .checkActiveSubscription(account);
+
+        verify(quotaService, never())
+                .checkQuota(account);
+
+        verify(employeeSearchService, never())
+                .search(anyString(), anyInt());
+    }
+
+    @Test
+    void shouldRejectWhenSubscriptionDoesNotExist() {
+
+        when(authentication.getName())
+                .thenReturn("test@example.com");
+
+        when(accountRepository.findByEmail("test@example.com"))
+                .thenReturn(Optional.of(account));
+
+        doThrow(new SubscriptionException(
+                "No active subscription found"
+        ))
+                .when(subscriptionService)
+                .checkActiveSubscription(account);
+
+        assertThrows(
+                SubscriptionException.class,
+                () -> employeeController.search(
+                        "Wipro",
+                        authentication
+                )
+        );
+
+        verify(subscriptionService)
+                .checkActiveSubscription(account);
+
+        verify(quotaService, never())
                 .checkQuota(account);
 
         verify(employeeSearchService, never())
