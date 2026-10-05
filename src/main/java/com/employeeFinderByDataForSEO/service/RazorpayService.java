@@ -19,11 +19,13 @@ public class RazorpayService {
     private final RazorpayClient razorpayClient;
     private final RazorpayConfig razorpayConfig;
     private final PaymentRepository paymentRepository;
+    private final SubscriptionService subscriptionService;
 
-    public RazorpayService(RazorpayClient razorpayClient, RazorpayConfig razorpayConfig, PaymentRepository paymentRepository) {
+    public RazorpayService(RazorpayClient razorpayClient, RazorpayConfig razorpayConfig, PaymentRepository paymentRepository, SubscriptionService subscriptionService) {
         this.razorpayClient = razorpayClient;
         this.razorpayConfig = razorpayConfig;
         this.paymentRepository = paymentRepository;
+        this.subscriptionService = subscriptionService;
     }
 
 
@@ -95,6 +97,8 @@ public class RazorpayService {
             payment.setStatus("SUCCESS");
 
             paymentRepository.save(payment);
+
+            subscriptionService.createSubscription(payment.getAccount());
 
             return true;
 

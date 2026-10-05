@@ -1,65 +1,130 @@
 package com.employeeFinderByDataForSEO.controller;
 
 import com.employeeFinderByDataForSEO.Entity.Account;
-import com.employeeFinderByDataForSEO.exception.DailyQuotaExceededException;
+import com.employeeFinderByDataForSEO.dto.EmployeeResponse;
 import com.employeeFinderByDataForSEO.repository.AccountRepository;
 import com.employeeFinderByDataForSEO.service.EmployeeSearchService;
 import com.employeeFinderByDataForSEO.service.QuotaService;
+import com.employeeFinderByDataForSEO.service.SubscriptionService;
+import com.employeeFinderByDataForSEO.exception.DailyQuotaExceededException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class EmployeeControllerTest {
 
+    @Mock
     private EmployeeSearchService employeeSearchService;
+
+    @Mock
     private AccountRepository accountRepository;
+
+    @Mock
     private QuotaService quotaService;
+
+    @Mock
+    private SubscriptionService subscriptionService;
+
+    @Mock
     private Authentication authentication;
 
     private EmployeeController employeeController;
 
+    private Account account;
+
     @BeforeEach
     void setUp() {
 
-        employeeSearchService =
-                mock(EmployeeSearchService.class);
+        employeeController = new EmployeeController(
+                employeeSearchService,
+                accountRepository,
+                quotaService,
+                subscriptionService
+        );
 
-        accountRepository =
-                mock(AccountRepository.class);
-
-        quotaService =
-                mock(QuotaService.class);
-
-        authentication =
-                mock(Authentication.class);
-
-        employeeController =
-                new EmployeeController(
-                        employeeSearchService,
-                        accountRepository,
-                        quotaService
-                );
+        account = new Account(
+                1L,
+                "testuser",
+                "password",
+                null,
+                "test@example.com"
+        );
     }
 
     @Test
-    void shouldRejectRequestWhenDailyQuotaIsExceeded() {
+    void shouldReturnEmployeesSuccessfully() {
 
         when(authentication.getName())
-                .thenReturn("abishek@example.com");
+                .thenReturn("test@example.com");
 
-        Account account = new Account();
+        when(accountRepository.findByEmail("test@example.com"))
+                .thenReturn(Optional.of(account));
 
-        when(accountRepository.findByEmail("abishek@example.com"))
-                .thenReturn(java.util.Optional.of(account));
+        doNothing()
+                .when(subscriptionService)
+                .checkActiveSubscription(account);
 
-        doThrow(
-                new DailyQuotaExceededException(
-                        "Daily employee profile quota exceeded"
-                )
-        ).when(quotaService).checkQuota(account);
+        when(quotaService.getRemainingQuota(account))
+                .thenReturn(100L);
+
+        List<EmployeeResponse> employees = List.of(
+                new EmployeeResponse()
+        );
+
+        when(employeeSearchService.search("Wipro", 10))
+                .thenReturn(employees);
+
+        List<EmployeeResponse> result =
+                employeeController.search(
+                        "Wipro",
+                        authentication
+                );
+
+        assertNotNull(result);
+        assertEquals(1, result.size());
+
+        verify(subscriptionService)
+                .checkActiveSubscription(account);
+
+        verify(quotaService)
+                .checkQuota(account);
+
+        verify(employeeSearchService)
+                .search("Wipro", 10);
+
+        verify(quotaService)
+                .consumeProfiles(account, 1);
+    }
+
+    @Test
+    void shouldRejectWhenDailyQuotaExceeded() {
+
+        when(authentication.getName())
+                .thenReturn("test@example.com");
+
+        when(accountRepository.findByEmail("test@example.com"))
+                .thenReturn(Optional.of(account));
+
+        doNothing()
+                .when(subscriptionService)
+                .checkActiveSubscription(account);
+
+        doThrow(new DailyQuotaExceededException(
+                "Daily quota exceeded"
+        ))
+                .when(quotaService)
+                .checkQuota(account);
 
         assertThrows(
                 DailyQuotaExceededException.class,
@@ -68,6 +133,12 @@ class EmployeeControllerTest {
                         authentication
                 )
         );
+
+        verify(subscriptionService)
+                .checkActiveSubscription(account);
+
+        verify(quotaService)
+                .checkQuota(account);
 
         verify(employeeSearchService, never())
                 .search(anyString(), anyInt());
