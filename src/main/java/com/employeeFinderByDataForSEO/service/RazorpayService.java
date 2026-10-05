@@ -92,6 +92,10 @@ public class RazorpayService {
                     .orElseThrow(() ->
                             new RuntimeException("Payment not found"));
 
+            if ("SUCCESS".equals(payment.getStatus())) {
+                return true;
+            }
+
             payment.setRazorpayPaymentId(razorpayPaymentId);
             payment.setStatus("SUCCESS");
 
