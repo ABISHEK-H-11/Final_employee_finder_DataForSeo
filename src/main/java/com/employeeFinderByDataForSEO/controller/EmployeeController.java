@@ -5,6 +5,7 @@ import com.employeeFinderByDataForSEO.dto.EmployeeResponse;
 import com.employeeFinderByDataForSEO.repository.AccountRepository;
 import com.employeeFinderByDataForSEO.service.EmployeeSearchService;
 import com.employeeFinderByDataForSEO.service.QuotaService;
+import com.employeeFinderByDataForSEO.service.SubscriptionService;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,11 +22,13 @@ public class EmployeeController {
     private final EmployeeSearchService employeeSearchService;
     private final AccountRepository accountRepository;
     private final QuotaService quotaService;
+    private final SubscriptionService subscriptionService;
 
-    public EmployeeController(EmployeeSearchService employeeSearchService, AccountRepository accountRepository, QuotaService quotaService) {
+    public EmployeeController(EmployeeSearchService employeeSearchService, AccountRepository accountRepository, QuotaService quotaService, SubscriptionService subscriptionService) {
         this.employeeSearchService = employeeSearchService;
         this.accountRepository = accountRepository;
         this.quotaService = quotaService;
+        this.subscriptionService = subscriptionService;
     }
 
 
@@ -37,6 +40,8 @@ public class EmployeeController {
         Account account = accountRepository.findByEmail(email)
                 .orElseThrow(() ->
                         new RuntimeException("Account not found"));
+
+        subscriptionService.checkActiveSubscription(account);
 
         quotaService.checkQuota(account);
 
