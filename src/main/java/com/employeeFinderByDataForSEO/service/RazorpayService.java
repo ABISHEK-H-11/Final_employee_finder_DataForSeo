@@ -1,28 +1,33 @@
 package com.employeeFinderByDataForSEO.service;
 
+import com.employeeFinderByDataForSEO.Entity.Account;
+import com.employeeFinderByDataForSEO.Entity.Payment;
 import com.employeeFinderByDataForSEO.config.RazorpayConfig;
+import com.employeeFinderByDataForSEO.repository.PaymentRepository;
+
 import com.razorpay.Order;
 import com.razorpay.RazorpayClient;
 import com.razorpay.RazorpayException;
 import com.razorpay.Utils;
 import org.json.JSONObject;
 import org.springframework.stereotype.Service;
+import java.time.LocalDateTime;
 
 @Service
 public class RazorpayService {
 
     private final RazorpayClient razorpayClient;
     private final RazorpayConfig razorpayConfig;
+    private final PaymentRepository paymentRepository;
 
-    public RazorpayService(
-            RazorpayClient razorpayClient,
-            RazorpayConfig razorpayConfig) {
-
+    public RazorpayService(RazorpayClient razorpayClient, RazorpayConfig razorpayConfig, PaymentRepository paymentRepository) {
         this.razorpayClient = razorpayClient;
         this.razorpayConfig = razorpayConfig;
+        this.paymentRepository = paymentRepository;
     }
 
-    public Order createOrder(int amount, String currency)
+
+    public Payment createOrder(int amount, String currency, Account account)
             throws RazorpayException {
 
         JSONObject orderRequest = new JSONObject();
@@ -33,8 +38,19 @@ public class RazorpayService {
                 "receipt",
                 "receipt_" + System.currentTimeMillis()
         );
+        Order razorpayOrder =
+                razorpayClient.orders.create(orderRequest);
 
-        return razorpayClient.orders.create(orderRequest);
+        Payment payment = new Payment();
+
+        payment.setAccount(account);
+        payment.setRazorpayOrderId(razorpayOrder.get("id"));
+        payment.setAmount(amount);
+        payment.setCurrency(currency);
+        payment.setStatus("CREATED");
+        payment.setCreatedAt(LocalDateTime.now());
+
+        return paymentRepository.save(payment);
     }
 
     public boolean verifyPayment(
@@ -61,14 +77,34 @@ public class RazorpayService {
                     razorpaySignature
             );
 
-            return Utils.verifyPaymentSignature(
+            boolean verified = Utils.verifyPaymentSignature(
                     attributes,
                     razorpayConfig.getKeySecret()
             );
+
+            if (!verified) {
+                return false;
+            }
+
+            Payment payment = paymentRepository
+                    .findByRazorpayOrderId(razorpayOrderId)
+                    .orElseThrow(() ->
+                            new RuntimeException("Payment not found"));
+
+            payment.setRazorpayPaymentId(razorpayPaymentId);
+            payment.setStatus("SUCCESS");
+
+            paymentRepository.save(payment);
+
+            return true;
 
         } catch (Exception e) {
 
             return false;
         }
+
+    }
+    public String getKeyId() {
+        return razorpayConfig.getKeyId();
     }
 }

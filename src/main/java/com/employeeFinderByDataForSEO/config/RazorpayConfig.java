@@ -23,4 +23,8 @@ public class RazorpayConfig {
     public String getKeySecret() {
         return keySecret;
     }
+
+    public String getKeyId() {
+        return keyId;
+    }
 }

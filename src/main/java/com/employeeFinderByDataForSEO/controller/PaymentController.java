@@ -1,11 +1,15 @@
 package com.employeeFinderByDataForSEO.controller;
 
+import com.employeeFinderByDataForSEO.Entity.Account;
+import com.employeeFinderByDataForSEO.Entity.Payment;
 import com.employeeFinderByDataForSEO.dto.CreateOrderRequest;
 import com.employeeFinderByDataForSEO.dto.PaymentVerificationRequest;
+import com.employeeFinderByDataForSEO.repository.AccountRepository;
 import com.employeeFinderByDataForSEO.service.RazorpayService;
 import com.razorpay.Order;
 import com.razorpay.RazorpayException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -16,31 +20,57 @@ import java.util.Map;
 public class PaymentController {
 
     private final RazorpayService razorpayService;
+    private final AccountRepository accountRepository;
 
-    public PaymentController(RazorpayService razorpayService) {
+    public PaymentController(RazorpayService razorpayService, AccountRepository accountRepository) {
         this.razorpayService = razorpayService;
+        this.accountRepository = accountRepository;
     }
 
     @PostMapping("/create-order")
     public ResponseEntity<?> createOrder(
-            @RequestBody CreateOrderRequest request) {
+            @RequestBody CreateOrderRequest request,
+            Authentication authentication) {
 
         try {
-            Order order = razorpayService.createOrder(
+
+            String email = authentication.getName();
+
+            Account account = accountRepository
+                    .findByEmail(email)
+                    .orElseThrow(() ->
+                            new RuntimeException("Account not found"));
+
+            Payment payment = razorpayService.createOrder(
                     request.getAmount(),
-                    "INR"
+                    "INR",
+                    account
             );
 
             Map<String, Object> response = new HashMap<>();
 
-            response.put("orderId", order.get("id"));
-            response.put("amount", order.get("amount"));
-            response.put("currency", order.get("currency"));
+            response.put(
+                    "orderId",
+                    payment.getRazorpayOrderId()
+            );
+
+            response.put(
+                    "amount",
+                    payment.getAmount()
+            );
+
+            response.put(
+                    "currency",
+                    payment.getCurrency()
+            );
+            response.put("keyId", razorpayService.getKeyId());
 
             return ResponseEntity.ok(response);
 
         } catch (RazorpayException e) {
-            return ResponseEntity.internalServerError()
+
+            return ResponseEntity
+                    .internalServerError()
                     .body("Failed to create Razorpay order");
         }
     }
