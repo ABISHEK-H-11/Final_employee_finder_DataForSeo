@@ -41,8 +41,10 @@ public class PaymentController {
                     .orElseThrow(() ->
                             new RuntimeException("Account not found"));
 
+            int amount = razorpayService.getPlanAmount(request.getPlan());
+
             Payment payment = razorpayService.createOrder(
-                    request.getAmount(),
+                    amount,
                     "INR",
                     account
             );
@@ -66,6 +68,12 @@ public class PaymentController {
             response.put("keyId", razorpayService.getKeyId());
 
             return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+
+            return ResponseEntity
+                    .badRequest()
+                    .body(e.getMessage());
 
         } catch (RazorpayException e) {
 

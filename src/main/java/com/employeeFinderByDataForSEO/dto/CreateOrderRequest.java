@@ -2,13 +2,13 @@ package com.employeeFinderByDataForSEO.dto;
 
 public class CreateOrderRequest {
 
-    private int amount;
+    private String plan;
 
-    public int getAmount() {
-        return amount;
+    public String getPlan() {
+        return plan;
     }
 
-    public void setAmount(int amount) {
-        this.amount = amount;
+    public void setPlan(String plan) {
+        this.plan = plan;
     }
 }

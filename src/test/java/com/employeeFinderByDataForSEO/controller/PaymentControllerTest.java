@@ -12,8 +12,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.core.Authentication;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 
 import java.util.Optional;
 
@@ -53,13 +53,12 @@ class PaymentControllerTest {
     void shouldCreateOrderSuccessfully() throws Exception {
 
         CreateOrderRequest request = new CreateOrderRequest();
-
-        request.setAmount(999);
+        request.setPlan("STANDARD");
 
         Payment payment = new Payment();
         payment.setAccount(account);
         payment.setRazorpayOrderId("order_test123");
-        payment.setAmount(999);
+        payment.setAmount(99900);
         payment.setCurrency("INR");
 
         when(authentication.getName())
@@ -68,8 +67,11 @@ class PaymentControllerTest {
         when(accountRepository.findByEmail("test@example.com"))
                 .thenReturn(Optional.of(account));
 
+        when(razorpayService.getPlanAmount("STANDARD"))
+                .thenReturn(99900);
+
         when(razorpayService.createOrder(
-                999,
+                99900,
                 "INR",
                 account
         )).thenReturn(payment);
@@ -83,7 +85,10 @@ class PaymentControllerTest {
                         authentication
                 );
 
-        assertEquals(200, response.getStatusCode().value());
+        assertEquals(
+                200,
+                response.getStatusCode().value()
+        );
 
         assertNotNull(response.getBody());
 
@@ -91,7 +96,14 @@ class PaymentControllerTest {
                 .findByEmail("test@example.com");
 
         verify(razorpayService)
-                .createOrder(999, "INR", account);
+                .getPlanAmount("STANDARD");
+
+        verify(razorpayService)
+                .createOrder(
+                        99900,
+                        "INR",
+                        account
+                );
     }
 
     @Test
@@ -169,10 +181,12 @@ class PaymentControllerTest {
     }
 
     @Test
-    void shouldReturnErrorWhenOrderCreationFails() throws Exception {
+    void shouldRejectInvalidSubscriptionPlan() throws RazorpayException {
 
-        CreateOrderRequest request = new CreateOrderRequest();
-        request.setAmount(999);
+        CreateOrderRequest request =
+                new CreateOrderRequest();
+
+        request.setPlan("GOLD");
 
         when(authentication.getName())
                 .thenReturn("test@example.com");
@@ -180,8 +194,59 @@ class PaymentControllerTest {
         when(accountRepository.findByEmail("test@example.com"))
                 .thenReturn(Optional.of(account));
 
+        when(razorpayService.getPlanAmount("GOLD"))
+                .thenThrow(
+                        new IllegalArgumentException(
+                                "Invalid subscription plan"
+                        )
+                );
+
+        ResponseEntity<?> response =
+                paymentController.createOrder(
+                        request,
+                        authentication
+                );
+
+        assertEquals(
+                400,
+                response.getStatusCode().value()
+        );
+
+        assertEquals(
+                "Invalid subscription plan",
+                response.getBody()
+        );
+
+        verify(razorpayService)
+                .getPlanAmount("GOLD");
+
+        verify(razorpayService, never())
+                .createOrder(
+                        anyInt(),
+                        anyString(),
+                        any(Account.class)
+                );
+    }
+
+    @Test
+    void shouldReturnErrorWhenOrderCreationFails() throws Exception {
+
+        CreateOrderRequest request =
+                new CreateOrderRequest();
+
+        request.setPlan("STANDARD");
+
+        when(authentication.getName())
+                .thenReturn("test@example.com");
+
+        when(accountRepository.findByEmail("test@example.com"))
+                .thenReturn(Optional.of(account));
+
+        when(razorpayService.getPlanAmount("STANDARD"))
+                .thenReturn(99900);
+
         when(razorpayService.createOrder(
-                999,
+                99900,
                 "INR",
                 account
         )).thenThrow(
@@ -205,6 +270,13 @@ class PaymentControllerTest {
         );
 
         verify(razorpayService)
-                .createOrder(999, "INR", account);
+                .getPlanAmount("STANDARD");
+
+        verify(razorpayService)
+                .createOrder(
+                        99900,
+                        "INR",
+                        account
+                );
     }
 }

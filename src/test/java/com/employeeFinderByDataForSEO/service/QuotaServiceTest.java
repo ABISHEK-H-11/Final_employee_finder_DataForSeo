@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.Optional;
-
+import com.employeeFinderByDataForSEO.exception.DailyQuotaExceededException;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class QuotaServiceTest {
@@ -81,7 +81,7 @@ class QuotaServiceTest {
                 .thenReturn(Optional.of(usage));
 
         org.junit.jupiter.api.Assertions.assertThrows(
-                IllegalStateException.class,
+                DailyQuotaExceededException.class,
                 () -> quotaService.consumeProfiles(account, 100)
         );
 

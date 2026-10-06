@@ -1,12 +1,42 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Razorpay Test Payment</title>
+
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 500px;
+            margin: 60px auto;
+            padding: 20px;
+        }
+
+        input, button {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            box-sizing: border-box;
+        }
+
+        button {
+            cursor: pointer;
+        }
+
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            white-space: pre-wrap;
+            background: #f5f5f5;
+        }
+    </style>
 </head>
 
 <body>
 
-<h2>Razorpay Test Payment</h2>
+<h2>Employee Finder - Test Payment</h2>
 
 <h3>Login</h3>
 
@@ -14,152 +44,198 @@
         type="email"
         id="email"
         placeholder="Email"
->
-
-<br><br>
+        value="test@example.com">
 
 <input
         type="password"
         id="password"
-        placeholder="Password"
->
+        placeholder="Password">
 
-<br><br>
-
-<button onclick="login()">
-    Login
-</button>
-
-<p id="loginStatus"></p>
+<button onclick="login()">Login</button>
 
 <hr>
 
 <h3>Payment</h3>
 
-<button onclick="startPayment()">
-    Pay ₹100
+<button onclick="createOrder()">
+    Pay ₹600
 </button>
 
-<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<div id="result"></div>
 
 <script>
+
+    let orderData = null;
 
     async function login() {
 
         const email = document.getElementById("email").value;
         const password = document.getElementById("password").value;
 
-        const response = await fetch("/api/auth/login", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            credentials: "include",
-            body: JSON.stringify({
-                email: email,
-                password: password
-            })
-        });
+        try {
 
-        const result = await response.text();
+            const response = await fetch(
+                "/api/auth/login",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    credentials: "include",
+                    body: JSON.stringify({
+                        email: email,
+                        password: password
+                    })
+                }
+            );
 
-        if (!response.ok) {
-            document.getElementById("loginStatus").innerText =
-                "Login failed: " + result;
-            return;
+            const result = await response.text();
+
+            document.getElementById("result").innerText =
+                "Login response:\n" + result;
+
+        } catch (error) {
+
+            document.getElementById("result").innerText =
+                "Login error:\n" + error;
         }
-
-        document.getElementById("loginStatus").innerText =
-            "Login successful!";
     }
 
 
-    async function startPayment() {
+    async function createOrder() {
 
-        const response = await fetch("/api/payment/create-order", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            credentials: "include",
-            body: JSON.stringify({
-                amount: 10000
-            })
-        });
+        try {
 
-        if (!response.ok) {
-            const error = await response.text();
-
-            alert(
-                "Failed to create order\n\n" +
-                "Status: " + response.status +
-                "\n" + error
+            const response = await fetch(
+                "/api/payment/create-order",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    credentials: "include",
+                    body: JSON.stringify({
+                        plan: "STANDARD"
+                    })
+                }
             );
 
-            return;
+            if (!response.ok) {
+
+                const error = await response.text();
+
+                document.getElementById("result").innerText =
+                    "Order creation failed:\n" + error;
+
+                return;
+            }
+
+            orderData = await response.json();
+
+            document.getElementById("result").innerText =
+                "Order created:\n" +
+                JSON.stringify(orderData, null, 2);
+
+            openRazorpayCheckout();
+
+        } catch (error) {
+
+            document.getElementById("result").innerText =
+                "Error:\n" + error;
         }
+    }
 
-        const order = await response.json();
 
-        console.log("Order:", order);
+    function openRazorpayCheckout() {
 
         const options = {
 
-            key: order.keyId,
+            key: orderData.keyId,
 
-            amount: order.amount,
+            amount: orderData.amount,
 
-            currency: order.currency,
+            currency: orderData.currency,
 
             name: "Employee Finder",
 
-            description: "Test Subscription",
+            description: "STANDARD Subscription",
 
-            order_id: order.orderId,
+            order_id: orderData.orderId,
 
-            handler: async function(paymentResponse) {
+            handler: async function (response) {
 
-                console.log(
-                    "Razorpay Payment Response:",
-                    paymentResponse
-                );
+                console.log("Razorpay response:", response);
 
-                const verifyResponse = await fetch(
-                    "/api/payment/verify",
-                    {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json"
-                        },
-                        credentials: "include",
-                        body: JSON.stringify({
+                document.getElementById("result").innerText =
+                    "Payment successful!\n\n" +
+                    "Order ID: " +
+                    response.razorpay_order_id +
+                    "\n\nPayment ID: " +
+                    response.razorpay_payment_id +
+                    "\n\nSignature: " +
+                    response.razorpay_signature;
 
-                            razorpayOrderId:
-                            paymentResponse.razorpay_order_id,
+                await verifyPayment(response);
+            },
 
-                            razorpayPaymentId:
-                            paymentResponse.razorpay_payment_id,
+            prefill: {
+                email: document.getElementById("email").value
+            },
 
-                            razorpaySignature:
-                            paymentResponse.razorpay_signature
-                        })
-                    }
-                );
-
-                const result = await verifyResponse.text();
-
-                alert(result);
-
-                console.log(
-                    "Verification:",
-                    result
-                );
+            theme: {
+                color: "#3399cc"
             }
         };
 
         const razorpay = new Razorpay(options);
 
+        razorpay.on("payment.failed", function (response) {
+
+            document.getElementById("result").innerText =
+                "Payment failed:\n" +
+                JSON.stringify(response.error, null, 2);
+        });
+
         razorpay.open();
+    }
+
+
+    async function verifyPayment(response) {
+
+        try {
+
+            const verifyResponse = await fetch(
+                "/api/payment/verify",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    credentials: "include",
+                    body: JSON.stringify({
+
+                        razorpayOrderId:
+                        response.razorpay_order_id,
+
+                        razorpayPaymentId:
+                        response.razorpay_payment_id,
+
+                        razorpaySignature:
+                        response.razorpay_signature
+                    })
+                }
+            );
+
+            const result = await verifyResponse.text();
+
+            document.getElementById("result").innerText +=
+                "\n\nVerification response:\n" + result;
+
+        } catch (error) {
+
+            document.getElementById("result").innerText +=
+                "\n\nVerification error:\n" + error;
+        }
     }
 
 </script>

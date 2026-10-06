@@ -37,7 +37,7 @@ public class DataForSeoClient {
             @Value("${dataforseo.password}") String password) {
 
         this.restClient = builder
-                .baseUrl("https://sandbox.dataforseo.com")
+                .baseUrl("https://api.dataforseo.com")
                 .defaultHeaders(headers ->
                         headers.setBasicAuth(login, password))
                 .build();

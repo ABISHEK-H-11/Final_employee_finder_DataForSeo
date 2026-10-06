@@ -7,7 +7,7 @@ import com.employeeFinderByDataForSEO.repository.AccountRepository;
 import com.employeeFinderByDataForSEO.repository.AccountUsageRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
-
+import com.employeeFinderByDataForSEO.exception.DailyQuotaExceededException;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -111,8 +111,8 @@ public class QuotaService {
                         + profileCount;
 
         if (newUsage > DAILY_PROFILE_LIMIT) {
-            throw new IllegalStateException(
-                    "Daily profile quota exceeded"
+            throw new DailyQuotaExceededException(
+                    "Daily employee profile quota exceeded"
             );
         }
 

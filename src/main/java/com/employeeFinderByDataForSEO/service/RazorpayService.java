@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 
 @Service
 public class RazorpayService {
+    private static final int STANDARD_PLAN_AMOUNT = 60000;
 
     private final RazorpayClient razorpayClient;
     private final RazorpayConfig razorpayConfig;
@@ -27,7 +28,14 @@ public class RazorpayService {
         this.paymentRepository = paymentRepository;
         this.subscriptionService = subscriptionService;
     }
+    public int getPlanAmount(String plan) {
 
+        if ("STANDARD".equalsIgnoreCase(plan)) {
+            return STANDARD_PLAN_AMOUNT;
+        }
+
+        throw new IllegalArgumentException("Invalid subscription plan");
+    }
     public Payment createOrder(int amount, String currency, Account account)
             throws RazorpayException {
 
