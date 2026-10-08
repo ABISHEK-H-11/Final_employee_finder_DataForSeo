@@ -1,13 +1,10 @@
-# Employee Finder - DataForSEO
+# 🔎 LeadScope — B2B Employee & Lead Discovery Platform
 
 ![Java CI](https://github.com/ABISHEK-H-11/Final_employee_finder_DataForSeo/actions/workflows/ci.yml/badge.svg)
 
-A Spring Boot application that retrieves and manages employee LinkedIn profiles using DataForSEO.
-# 🔎 Employee Finder API
+**LeadScope** is a Spring Boot-based B2B employee and lead discovery platform that retrieves and manages employee LinkedIn profiles based on company names.
 
-A Spring Boot backend application that searches employee profile data based on company names and manages retrieved profiles using a MySQL database.
-
-The project focuses on **API integration, authentication, quota management, caching, persistence, pagination and automated testing**.
+The application integrates with **DataForSEO** to discover employee profiles and uses authentication, quota management, caching, persistence, pagination, automated testing, Docker, and GitHub Actions CI.
 
 ---
 
@@ -15,16 +12,16 @@ The project focuses on **API integration, authentication, quota management, cach
 
 | Technology | Usage |
 |---|---|
-| Java 21 | Backend development |
-| Spring Boot | REST API |
-| Spring Security | Authentication & authorization |
-| JWT | Secure authentication |
-| MySQL | Persistent storage |
-| JPA / Hibernate | ORM |
-| Maven | Build management |
-| Docker | Containerization |
-| GitHub Actions | CI |
-| DataForSEO | External search API |
+| **Java 21** | Backend development |
+| **Spring Boot** | REST API development |
+| **Spring Security** | Authentication & authorization |
+| **JWT** | Secure authentication |
+| **MySQL** | Persistent data storage |
+| **JPA / Hibernate** | ORM & database access |
+| **Maven** | Build & dependency management |
+| **Docker** | Application containerization |
+| **GitHub Actions** | Continuous Integration |
+| **DataForSEO** | External employee/profile search |
 
 ---
 
@@ -32,47 +29,48 @@ The project focuses on **API integration, authentication, quota management, cach
 
 - 🔐 JWT-based authentication
 - 👤 Account registration and login
-- 📊 Daily profile usage quota
-- 🔎 Company-based employee search
-- 📄 Pagination
+- 📊 Account-level daily profile quota
+- 🔎 Company-based employee discovery
+- 📄 Paginated employee results
 - ♻️ Duplicate profile prevention
-- ⚡ Database-backed caching/search state
+- ⚡ Database-backed search state and caching
 - 🗄️ MySQL persistence
-- 🧪 Automated tests
+- 🧪 Automated backend testing
 - 🐳 Docker support
 - 🔄 GitHub Actions CI
-- 🔒 Environment-variable based secrets
+- 🔒 Environment-variable based secret management
+- 🌐 External API integration
 
 ---
 
 ## 🏗️ Architecture
 
 ```text
-Client
-  │
-  ▼
-REST Controller
-  │
-  ▼
-Spring Security / JWT
-  │
-  ▼
-Service Layer
-  │
-  ├── Quota Service
-  │
-  ├── Employee Search Service
-  │
-  └── External API Client
-  │
-  ▼
-Repository Layer
-  │
-  ▼
-MySQL
+                         Client
+                           │
+                           ▼
+                    REST Controllers
+                           │
+                           ▼
+                 Spring Security / JWT
+                           │
+                           ▼
+                     Service Layer
+                           │
+             ┌─────────────┼─────────────┐
+             ▼             ▼             ▼
+       Quota Service  Employee Search  External API
+                           Service       Client
+             │             │             │
+             └─────────────┼─────────────┘
+                           ▼
+                    Repository Layer
+                           │
+                           ▼
+                         MySQL
 ```
 
-External search flow:
+### Employee Discovery Flow
 
 ```text
 Client
@@ -81,7 +79,7 @@ Client
 Employee API
   │
   ▼
-Check Authentication
+Authenticate Request
   │
   ▼
 Check Daily Quota
@@ -89,23 +87,30 @@ Check Daily Quota
   ▼
 Check Existing Profiles
   │
-  ▼
-Search External API
+  ├── Profiles Available ──► Return Paginated Results
   │
-  ▼
-Store Profiles
-  │
-  ▼
-Return Paginated Results
+  └── Profiles Required
+              │
+              ▼
+       Search DataForSEO
+              │
+              ▼
+        Store Profiles
+              │
+              ▼
+       Update Search State
+              │
+              ▼
+       Return Results
 ```
 
 ---
 
 ## 🔐 Authentication
 
-The application uses Spring Security and JWT authentication.
+LeadScope uses **Spring Security with JWT authentication** to protect employee search APIs.
 
-Authentication flow:
+### Authentication Flow
 
 ```text
 Register
@@ -121,54 +126,134 @@ JWT Validation
 Protected API Access
 ```
 
-JWT secrets and external API credentials are stored using environment variables rather than committed to source control.
+JWT secrets and external API credentials are stored using environment variables and are **not committed to source control**.
 
 ---
 
-## 📊 Daily Quota
+## 📊 Daily Profile Quota
 
-The application implements account-level daily profile usage tracking.
+LeadScope implements account-level daily profile usage tracking.
+
+The current application limit is:
+
+```text
+10,000 profiles / account / day
+```
+
+### Quota Flow
+
+```text
+Request
+   ↓
+Authenticate Account
+   ↓
+Check Current Usage
+   ↓
+Calculate Remaining Quota
+   ↓
+Process Search
+   ↓
+Return Profiles
+   ↓
+Update Usage
+```
+
+The quota is reset according to the application's configured time zone.
+
+---
+
+## 🗄️ Database Design
+
+LeadScope uses **MySQL** for persistent storage.
+
+### Main Entities
+
+```text
+Account
+   │
+   └── AccountUsage
+
+CompanySearchState
+
+DiscoveredProfile
+```
+
+The database maintains:
+
+- User accounts
+- Authentication information
+- Daily usage
+- Company search state
+- Discovered employee profiles
+- Returned/unreturned profile state
+- Duplicate prevention information
+
+---
+
+## 🔎 Employee Search
+
+Employees can be searched using a company name.
 
 Example:
 
-```text
-Daily Limit: 10,000 profiles
-
-Request
-   ↓
-Check usage
-   ↓
-Calculate remaining quota
-   ↓
-Process request
-   ↓
-Increase usage
+```http
+GET /api/employees?company=Wipro
 ```
 
-The quota is reset according to the configured application time zone.
+The request:
+
+1. Authenticates the user
+2. Checks the account's daily quota
+3. Checks previously discovered profiles
+4. Searches the external API when required
+5. Stores newly discovered profiles
+6. Prevents duplicate profiles
+7. Returns paginated results
+8. Updates account usage
 
 ---
 
-## 🗄️ Database
+## 🔌 API Endpoints
 
-The application uses MySQL for persistent storage.
+### Authentication
 
-Main entities include:
+```http
+POST /api/auth/register
+```
 
-- Account
-- AccountUsage
-- CompanySearchState
-- DiscoveredProfile
+Register a new account.
 
-The database is used to maintain authentication data, usage information, search state and discovered profiles.
+```http
+POST /api/auth/login
+```
+
+Authenticate an account and establish JWT authentication.
+
+```http
+POST /api/auth/logout
+```
+
+Logout from the application.
+
+### Employee Search
+
+```http
+GET /api/employees?company=Wipro
+```
+
+Search employee profiles for a company.
+
+> 🔒 Employee search requires authentication.
 
 ---
 
 ## 🧪 Testing
 
-The project contains automated tests for backend functionality.
+The project includes automated backend tests covering core application functionality.
 
-Run tests with:
+### Run Tests
+
+Linux / macOS:
 
 ```bash
 ./mvnw test
@@ -180,7 +265,7 @@ Windows:
 .\mvnw.cmd test
 ```
 
-Build:
+### Build Application
 
 ```powershell
 .\mvnw.cmd clean package
@@ -188,35 +273,35 @@ Build:
 
 ---
 
-## 🐳 Running with Docker
+## 🐳 Docker
 
-Build the application:
+### 1. Build the Application
 
 ```powershell
 .\mvnw.cmd clean package -DskipTests
 ```
 
-Build the Docker image:
+### 2. Build Docker Image
 
 ```bash
-docker build -t employee-finder .
+docker build -t leadscope .
 ```
 
-Run the container:
+### 3. Run Container
 
 ```bash
-docker run -p 8080:8080 employee-finder
+docker run -p 8080:8080 leadscope
 ```
 
-Configure required environment variables before running the application.
+Configure the required environment variables before starting the application.
 
 ---
 
 ## ⚙️ Environment Variables
 
-Do not commit credentials to GitHub.
+Credentials should **never be committed to GitHub**.
 
-Example:
+Required environment variables include:
 
 ```text
 DATAFORSEO_LOGIN=
@@ -225,63 +310,58 @@ MYSQL_PASSWORD=
 JWT_SECRET=
 ```
 
-Create your own local environment configuration.
+For local development, configure these variables in your environment.
 
 ---
 
-## 🔌 Example API
+## 🔄 CI with GitHub Actions
 
-### Register
+Every push and pull request can be validated through the project's GitHub Actions workflow.
 
-```http
-POST /api/auth/register
-```
+The CI pipeline performs automated Maven builds and tests.
 
-### Login
-
-```http
-POST /api/auth/login
-```
-
-### Employee Search
-
-```http
-GET /api/employees?company=Wipro
-```
-
-The employee search endpoint requires authentication.
+![Java CI](https://github.com/ABISHEK-H-11/Final_employee_finder_DataForSeo/actions/workflows/ci.yml/badge.svg)
 
 ---
 
 ## 🎯 Engineering Highlights
 
-This project demonstrates practical backend engineering concepts including:
+This project demonstrates practical backend engineering concepts:
 
-- REST API design
-- Authentication and authorization
-- JWT security
-- Database persistence
+- RESTful API design
+- Spring Boot
+- Spring Security
+- JWT authentication
+- Authentication & authorization
+- MySQL database design
+- JPA / Hibernate
 - Transactional service logic
-- API integration
-- Caching
+- External API integration
+- Database-backed caching
 - Pagination
-- Quota management
+- Daily quota management
+- Duplicate prevention
 - Exception handling
 - Automated testing
-- Docker
-- CI/CD
+- Docker containerization
+- GitHub Actions CI
+- Environment-based configuration
 
 ---
 
-## 📌 Future Improvements
+## 🛣️ Future Improvements
 
-- Redis-based distributed caching
-- Rate limiting
-- API Gateway
+Planned improvements include:
+
+- Redis distributed caching
+- API rate limiting
+- Spring Cloud API Gateway
 - Microservices architecture
 - AWS deployment
 - Kafka-based asynchronous processing
-- Observability and centralized logging
+- Centralized logging
+- Application monitoring and observability
+- Payment/subscription integration
 
 ---
 
@@ -289,6 +369,12 @@ This project demonstrates practical backend engineering concepts including:
 
 **Abishek H**
 
-Java Backend Developer
+**Java Backend Developer**
 
 [GitHub](https://github.com/ABISHEK-H-11)
+
+---
+
+## ⭐ Project
+
+If you find **LeadScope** useful or interesting, consider giving the repository a ⭐.
