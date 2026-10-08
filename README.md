@@ -1,3 +1,8 @@
+# Employee Finder - DataForSEO
+
+![Java CI](https://github.com/ABISHEK-H-11/Final_employee_finder_DataForSeo/actions/workflows/ci.yml/badge.svg)
+
+A Spring Boot application that retrieves and manages employee LinkedIn profiles using DataForSEO.
 # 🔎 Employee Finder API
 
 A Spring Boot backend application that searches employee profile data based on company names and manages retrieved profiles using a MySQL database.
