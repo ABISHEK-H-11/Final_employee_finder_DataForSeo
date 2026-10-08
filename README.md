@@ -1,90 +1,289 @@
-# Employee Finder — DataForSEO Integration
+# 🔎 Employee Finder API
 
-A Spring Boot REST API that discovers current employees' LinkedIn profiles for a given company name. Built during my internship at Ncube Beacons. It wraps the DataForSEO SERP API, deduplicates and persists results in MySQL, and returns up to 10 unique profiles per request — using progressively broader search terms until it finds enough or exhausts its search strategy.
+A Spring Boot backend application that searches employee profile data based on company names and manages retrieved profiles using a MySQL database.
 
-## What it actually does
+The project focuses on **API integration, authentication, quota management, caching, persistence, pagination and automated testing**.
 
-Given a company name, the service:
+---
 
-1. **Normalizes the company name** into a cache key (`CompanyKeyNormalizer`) — strips legal suffixes like "Pvt Ltd", "Inc", "LLC", punctuation, and casing, so "Google Inc.", "google inc", and "Google LLC" all map to the same cache entry.
-2. **Checks how many unused profiles are already cached** for that company in MySQL.
-3. **If fewer than 10 are available**, it queries the DataForSEO Google SERP API (`site:linkedin.com/in/ "company" "search term"`) using an ordered list of ~60 search terms (job titles, departments, seniority levels, and Indian cities), one term at a time, until it has 10 unused profiles or runs out of terms.
-4. **Stops early if a company looks "exhausted"** — after 8 consecutive search terms return zero new unique profiles, it gives up rather than burning through the remaining terms (and DataForSEO cost) for nothing.
-5. **Deduplicates by normalized LinkedIn URL** per company, so the same profile is never stored twice.
-6. **Classifies each result** as a likely current or former employee using text heuristics (looks for "Former", "Ex-", "previously at" vs. the company name being mentioned), and assigns a 0–100 confidence score based on signal strength.
-7. **Locks per-company** (not globally) so two simultaneous requests for the same company don't double-fetch, while requests for different companies run concurrently.
+## 🚀 Tech Stack
 
-## Tech stack
+| Technology | Usage |
+|---|---|
+| Java 21 | Backend development |
+| Spring Boot | REST API |
+| Spring Security | Authentication & authorization |
+| JWT | Secure authentication |
+| MySQL | Persistent storage |
+| JPA / Hibernate | ORM |
+| Maven | Build management |
+| Docker | Containerization |
+| GitHub Actions | CI |
+| DataForSEO | External search API |
 
-- **Java 21**, **Spring Boot 3.5**
-- **Spring Data JPA / Hibernate** — persistence for discovered profiles and per-company search progress
-- **MySQL**
-- **Spring `RestClient`** — calls to the DataForSEO API
-- **Maven**
+---
 
-## API
+## ✨ Key Features
 
-| Method | Endpoint | Description |
-|--------|----------|--------------|
-| `GET` | `/api/employees?company={companyName}` | Finds and returns up to 10 employee profiles for the given company. |
+- 🔐 JWT-based authentication
+- 👤 Account registration and login
+- 📊 Daily profile usage quota
+- 🔎 Company-based employee search
+- 📄 Pagination
+- ♻️ Duplicate profile prevention
+- ⚡ Database-backed caching/search state
+- 🗄️ MySQL persistence
+- 🧪 Automated tests
+- 🐳 Docker support
+- 🔄 GitHub Actions CI
+- 🔒 Environment-variable based secrets
 
-### Example request
+---
+
+## 🏗️ Architecture
+
+```text
+Client
+  │
+  ▼
+REST Controller
+  │
+  ▼
+Spring Security / JWT
+  │
+  ▼
+Service Layer
+  │
+  ├── Quota Service
+  │
+  ├── Employee Search Service
+  │
+  └── External API Client
+  │
+  ▼
+Repository Layer
+  │
+  ▼
+MySQL
+```
+
+External search flow:
+
+```text
+Client
+  │
+  ▼
+Employee API
+  │
+  ▼
+Check Authentication
+  │
+  ▼
+Check Daily Quota
+  │
+  ▼
+Check Existing Profiles
+  │
+  ▼
+Search External API
+  │
+  ▼
+Store Profiles
+  │
+  ▼
+Return Paginated Results
+```
+
+---
+
+## 🔐 Authentication
+
+The application uses Spring Security and JWT authentication.
+
+Authentication flow:
+
+```text
+Register
+   ↓
+Login
+   ↓
+JWT Generated
+   ↓
+Authenticated Request
+   ↓
+JWT Validation
+   ↓
+Protected API Access
+```
+
+JWT secrets and external API credentials are stored using environment variables rather than committed to source control.
+
+---
+
+## 📊 Daily Quota
+
+The application implements account-level daily profile usage tracking.
+
+Example:
+
+```text
+Daily Limit: 10,000 profiles
+
+Request
+   ↓
+Check usage
+   ↓
+Calculate remaining quota
+   ↓
+Process request
+   ↓
+Increase usage
+```
+
+The quota is reset according to the configured application time zone.
+
+---
+
+## 🗄️ Database
+
+The application uses MySQL for persistent storage.
+
+Main entities include:
+
+- Account
+- AccountUsage
+- CompanySearchState
+- DiscoveredProfile
+
+The database is used to maintain authentication data, usage information, search state and discovered profiles.
+
+---
+
+## 🧪 Testing
+
+The project contains automated tests for backend functionality.
+
+Run tests with:
+
+```bash
+./mvnw test
+```
+
+Windows:
+
+```powershell
+.\mvnw.cmd test
+```
+
+Build:
+
+```powershell
+.\mvnw.cmd clean package
+```
+
+---
+
+## 🐳 Running with Docker
+
+Build the application:
+
+```powershell
+.\mvnw.cmd clean package -DskipTests
+```
+
+Build the Docker image:
+
+```bash
+docker build -t employee-finder .
+```
+
+Run the container:
+
+```bash
+docker run -p 8080:8080 employee-finder
+```
+
+Configure required environment variables before running the application.
+
+---
+
+## ⚙️ Environment Variables
+
+Do not commit credentials to GitHub.
+
+Example:
+
+```text
+DATAFORSEO_LOGIN=
+DATAFORSEO_PASSWORD=
+MYSQL_PASSWORD=
+JWT_SECRET=
+```
+
+Create your own local environment configuration.
+
+---
+
+## 🔌 Example API
+
+### Register
 
 ```http
-GET /api/employees?company=Acme Corp
+POST /api/auth/register
 ```
 
-### Example response
+### Login
 
-```json
-[
-  {
-    "name": "Jane Doe",
-    "jobTitle": "Software Engineer",
-    "company": "Acme Corp",
-    "linkedin": "https://linkedin.com/in/janedoe",
-    "currentEmployee": true,
-    "confidence": 90
-  }
-]
+```http
+POST /api/auth/login
 ```
 
-*(Field names match `EmployeeResponse.java` exactly. Swap in a real captured response from Postman if you have one — always more convincing than a hand-written example.)*
+### Employee Search
 
-## Design notes worth mentioning in an interview
-
-- **Cost-aware fetching**: DataForSEO charges per call. The exhaustion check (8 empty terms in a row → stop) and the cache-first lookup both exist specifically to avoid paying for searches that won't yield new results.
-- **Per-company locking, not a global lock**: uses a `ConcurrentHashMap<String, Object>` of per-company lock objects, so concurrent searches for *different* companies never block each other — only two requests for the *same* company are serialized.
-- **Graceful degradation**: the DataForSEO client never throws on a failed or malformed remote response — it logs and returns an empty list, so one bad API call doesn't 500 the whole request.
-
-## Running locally
-
-⚠️ Before running this, make sure `application.properties` no longer contains real credentials committed to git — see the setup note below.
-
-```bash
-git clone https://github.com/ABISHEK-H-11/Final_employee_finder_DataForSeo.git
-cd Final_employee_finder_DataForSeo
+```http
+GET /api/employees?company=Wipro
 ```
 
-Set these as environment variables (or in a local, git-ignored `application.properties`):
+The employee search endpoint requires authentication.
 
-```properties
-spring.datasource.url=jdbc:mysql://localhost:3306/employee_finder
-spring.datasource.username=${DB_USERNAME}
-spring.datasource.password=${DB_PASSWORD}
-dataforseo.login=${DATAFORSEO_LOGIN}
-dataforseo.password=${DATAFORSEO_PASSWORD}
-```
+---
 
-Then:
+## 🎯 Engineering Highlights
 
-```bash
-mvn clean install
-mvn spring-boot:run
-```
+This project demonstrates practical backend engineering concepts including:
 
-Runs on `http://localhost:8080` by default.
+- REST API design
+- Authentication and authorization
+- JWT security
+- Database persistence
+- Transactional service logic
+- API integration
+- Caching
+- Pagination
+- Quota management
+- Exception handling
+- Automated testing
+- Docker
+- CI/CD
 
-## What this project demonstrates
+---
 
-REST API design, third-party API integration with graceful failure handling, JPA/Hibernate persistence, a real caching/cost-reduction strategy (not just a buzzword), and concurrency-safe per-resource locking — all from my internship work at Ncube Beacons.
+## 📌 Future Improvements
+
+- Redis-based distributed caching
+- Rate limiting
+- API Gateway
+- Microservices architecture
+- AWS deployment
+- Kafka-based asynchronous processing
+- Observability and centralized logging
+
+---
+
+## 👨‍💻 Author
+
+**Abishek H**
+
+Java Backend Developer
+
+[GitHub](https://github.com/ABISHEK-H-11)
