@@ -4,7 +4,7 @@
 
 **LeadScope** is a Spring Boot-based B2B employee and lead discovery platform that retrieves and manages employee LinkedIn profiles based on company names.
 
-The application integrates with **DataForSEO** to discover employee profiles and uses authentication, quota management, caching, persistence, pagination, automated testing, Docker, and GitHub Actions CI.
+The platform integrates with **DataForSEO** for employee discovery and provides **JWT authentication, subscription management, daily usage quotas, caching, persistence, pagination, automated testing, Docker, Razorpay payments, and GitHub Actions CI**.
 
 ---
 
@@ -22,6 +22,7 @@ The application integrates with **DataForSEO** to discover employee profiles and
 | **Docker** | Application containerization |
 | **GitHub Actions** | Continuous Integration |
 | **DataForSEO** | External employee/profile search |
+| **Razorpay** | Subscription & payment processing |
 
 ---
 
@@ -29,6 +30,8 @@ The application integrates with **DataForSEO** to discover employee profiles and
 
 - 🔐 JWT-based authentication
 - 👤 Account registration and login
+- 💳 Subscription-based access
+- 💰 Razorpay payment integration
 - 📊 Account-level daily profile quota
 - 🔎 Company-based employee discovery
 - 📄 Paginated employee results
@@ -39,7 +42,7 @@ The application integrates with **DataForSEO** to discover employee profiles and
 - 🐳 Docker support
 - 🔄 GitHub Actions CI
 - 🔒 Environment-variable based secret management
-- 🌐 External API integration
+- 🌐 DataForSEO external API integration
 
 ---
 
@@ -52,25 +55,43 @@ The application integrates with **DataForSEO** to discover employee profiles and
                     REST Controllers
                            │
                            ▼
-                 Spring Security / JWT
+                Spring Security / JWT
                            │
                            ▼
-                     Service Layer
+                  Subscription Check
                            │
-             ┌─────────────┼─────────────┐
-             ▼             ▼             ▼
-       Quota Service  Employee Search  External API
-                           Service       Client
-             │             │             │
-             └─────────────┼─────────────┘
-                           ▼
-                    Repository Layer
-                           │
-                           ▼
-                         MySQL
+                    ┌──────┴──────┐
+                    │             │
+                 Active        Inactive
+                    │             │
+                    ▼             ▼
+              Daily Quota     Subscription
+                 Check           Required
+                    │
+                    ▼
+                Service Layer
+                    │
+          ┌─────────┼──────────┐
+          │         │          │
+          ▼         ▼          ▼
+     Subscription  Quota   Employee Search
+       Service    Service      Service
+          │         │          │
+          │         │          ▼
+          │         │    DataForSEO Client
+          │         │          │
+          └─────────┼──────────┘
+                    │
+                    ▼
+             Repository Layer
+                    │
+                    ▼
+                  MySQL
 ```
 
-### Employee Discovery Flow
+---
+
+## 🔎 Employee Discovery Flow
 
 ```text
 Client
@@ -82,27 +103,101 @@ Employee API
 Authenticate Request
   │
   ▼
-Check Daily Quota
+Check Subscription
+  │
+  ├── Subscription Inactive ──► Reject Request
+  │
+  └── Subscription Active
+              │
+              ▼
+       Check Daily Quota
+              │
+              ▼
+      Check Existing Profiles
+              │
+       ┌──────┴──────────┐
+       │                 │
+       ▼                 ▼
+Profiles Available   Profiles Required
+       │                 │
+       ▼                 ▼
+Return Paginated    Search DataForSEO
+Results                   │
+                          ▼
+                   Store Profiles
+                          │
+                          ▼
+                  Update Search State
+                          │
+                          ▼
+                    Consume Quota
+                          │
+                          ▼
+                  Return Paginated
+                       Results
+```
+
+---
+
+## 💳 Subscription & Payment Flow
+
+LeadScope uses **Razorpay** to handle subscription/payment processing.
+
+```text
+Client
   │
   ▼
-Check Existing Profiles
+Select Subscription Plan
   │
-  ├── Profiles Available ──► Return Paginated Results
+  ▼
+Create Subscription / Payment
   │
-  └── Profiles Required
-              │
-              ▼
-       Search DataForSEO
-              │
-              ▼
-        Store Profiles
-              │
-              ▼
-       Update Search State
-              │
-              ▼
-       Return Results
+  ▼
+Razorpay
+  │
+  ▼
+Payment Successful
+  │
+  ▼
+Verify Payment
+  │
+  ▼
+Activate Subscription
+  │
+  ▼
+Account Gains API Access
+  │
+  ▼
+Employee Discovery APIs
 ```
+
+### Subscription Authorization
+
+```text
+API Request
+    │
+    ▼
+JWT Authentication
+    │
+    ▼
+Account Found?
+    │
+    ▼
+Subscription Active?
+    │
+ ┌──┴──┐
+ │     │
+Yes    No
+ │     │
+ ▼     ▼
+Check   Reject
+Quota   Request
+ │
+ ▼
+Employee Search
+```
+
+This ensures that employee discovery is available only to accounts with an active subscription.
 
 ---
 
@@ -123,10 +218,12 @@ Authenticated Request
    ↓
 JWT Validation
    ↓
+Subscription Validation
+   ↓
 Protected API Access
 ```
 
-JWT secrets and external API credentials are stored using environment variables and are **not committed to source control**.
+JWT secrets, database credentials, and payment/API credentials are stored using environment variables and are **not committed to source control**.
 
 ---
 
@@ -144,17 +241,19 @@ The current application limit is:
 
 ```text
 Request
-   ↓
+  ↓
 Authenticate Account
-   ↓
+  ↓
+Validate Subscription
+  ↓
 Check Current Usage
-   ↓
+  ↓
 Calculate Remaining Quota
-   ↓
+  ↓
 Process Search
-   ↓
+  ↓
 Return Profiles
-   ↓
+  ↓
 Update Usage
 ```
 
@@ -170,8 +269,10 @@ LeadScope uses **MySQL** for persistent storage.
 
 ```text
 Account
-   │
-   └── AccountUsage
+  │
+  ├── AccountUsage
+  │
+  └── Subscription
 
 CompanySearchState
 
@@ -182,7 +283,9 @@ The database maintains:
 
 - User accounts
 - Authentication information
-- Daily usage
+- Subscription status
+- Payment/subscription information
+- Daily profile usage
 - Company search state
 - Discovered employee profiles
 - Returned/unreturned profile state
@@ -203,13 +306,38 @@ GET /api/employees?company=Wipro
 The request:
 
 1. Authenticates the user
-2. Checks the account's daily quota
-3. Checks previously discovered profiles
-4. Searches the external API when required
-5. Stores newly discovered profiles
-6. Prevents duplicate profiles
-7. Returns paginated results
-8. Updates account usage
+2. Validates the user's subscription
+3. Checks the account's daily quota
+4. Checks previously discovered profiles
+5. Searches the external API when required
+6. Stores newly discovered profiles
+7. Prevents duplicate profiles
+8. Returns paginated results
+9. Updates account usage
+
+---
+
+## 💳 Subscription Management
+
+LeadScope uses subscription-based access to control usage of the employee discovery platform.
+
+A user must have an **active subscription** before accessing protected employee discovery functionality.
+
+### Subscription Lifecycle
+
+```text
+Created
+   ↓
+Payment Pending
+   ↓
+Payment Successful
+   ↓
+Active
+   ↓
+Expired / Cancelled
+```
+
+The application can use the subscription state to determine whether an account is allowed to consume employee search quota.
 
 ---
 
@@ -243,7 +371,23 @@ GET /api/employees?company=Wipro
 
 Search employee profiles for a company.
 
-> 🔒 Employee search requires authentication.
+> 🔒 Employee search requires authentication and an active subscription.
+
+### Subscription / Payment
+
+```http
+POST /api/subscription/create
+```
+
+Create a subscription/payment request.
+
+```http
+POST /api/subscription/verify
+```
+
+Verify the payment and activate the subscription.
+
+> The exact subscription endpoints may vary depending on the current controller implementation.
 
 ---
 
@@ -306,8 +450,13 @@ Required environment variables include:
 ```text
 DATAFORSEO_LOGIN=
 DATAFORSEO_PASSWORD=
+
 MYSQL_PASSWORD=
+
 JWT_SECRET=
+
+RAZORPAY_KEY_ID=
+RAZORPAY_KEY_SECRET=
 ```
 
 For local development, configure these variables in your environment.
@@ -333,6 +482,8 @@ This project demonstrates practical backend engineering concepts:
 - Spring Security
 - JWT authentication
 - Authentication & authorization
+- Subscription-based access control
+- Razorpay payment integration
 - MySQL database design
 - JPA / Hibernate
 - Transactional service logic
@@ -361,7 +512,10 @@ Planned improvements include:
 - Kafka-based asynchronous processing
 - Centralized logging
 - Application monitoring and observability
-- Payment/subscription integration
+- Advanced subscription plans
+- Usage analytics dashboard
+- Admin dashboard
+- Webhook-based subscription lifecycle management
 
 ---
 
